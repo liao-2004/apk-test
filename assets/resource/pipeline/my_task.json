@@ -1,26 +1,43 @@
 {
-    "MyTask1": {},
-    "MyTask2": {},
-    "MyTask3": {},
-    "FindSmallestNumber": {
-        "recognition": "Custom",
-        "custom_recognition": "find_smallest_number",
-        "custom_recognition_param": {
-            "candidate_rois": [
-                [100, 100, 200, 100],
-                [300, 100, 200, 100]
-            ]
-        },
-        "action": "Custom",
-        "custom_action": "click_target",
-        "custom_action_param": {
-            "target": [10, 20]
+    "$__mpe_config_新建Pipeline4": {
+        "$__mpe_code": {
+            "prefix": "",
+            "coordinateMode": "absolute-v1",
+            "savedViewport": {
+                "x": -373,
+                "y": 160,
+                "zoom": 0.94
+            },
+            "filename": "新建Pipeline4",
+            "version": "v2.1.1"
         }
     },
-    "RecognizeNumber": {
-        "recognition": "OCR"
+    "打开qq": {
+        "action": {
+            "type": "StartApp",
+            "param": {
+                "package": "com.tencent.mobileqq"
+            }
+        },
+        "$__mpe_code": {
+            "position": {
+                "x": 1126,
+                "y": 164
+            }
+        }
     },
-    "OcrTask": {
-        "recognition": "OCR"
+    "关闭qq": {
+        "action": {
+            "type": "StopApp",
+            "param": {
+                "package": "com.tencent.mobileqq"
+            }
+        },
+        "$__mpe_code": {
+            "position": {
+                "x": 1129,
+                "y": 351
+            }
+        }
     }
 }
