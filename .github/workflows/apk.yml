@@ -63,18 +63,41 @@ jobs:
           # 运行 Gradle 用；项目编译目标固定在 Java 17，见 build-logic/.../AndroidCommon.kt
           java-version: "21"
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: 准备 Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          # 不依赖 android-actions/setup-android：ubuntu runner 镜像本身就带 SDK，直接用它
+          SDK="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          if [[ -x "$SDK/cmdline-tools/latest/bin/sdkmanager" ]]; then
+            SDK_BIN="$SDK/cmdline-tools/latest/bin"
+          else
+            # 镜像换了布局时按 cmdline-tools/<version>/bin 兜一层
+            SDK_BIN="$(ls -d "$SDK"/cmdline-tools/*/bin 2>/dev/null | head -n1 || true)"
+          fi
+          if [[ -z "${SDK_BIN:-}" || ! -x "$SDK_BIN/sdkmanager" ]]; then
+            echo "找不到 sdkmanager，SDK 根目录是 $SDK，内容如下："
+            ls -la "$SDK" 2>/dev/null || true
+            exit 1
+          fi
+          echo "ANDROID_HOME=$SDK" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDK" >> "$GITHUB_ENV"
+          echo "$SDK_BIN" >> "$GITHUB_PATH"
+          echo "$SDK/platform-tools" >> "$GITHUB_PATH"
+          "$SDK_BIN/sdkmanager" --version
 
       - name: 安装 SDK 组件
         shell: bash
         run: |
+          set -euo pipefail
           # 先接受许可，AGP 才能在构建时自动补装 NDK / build-tools
           yes | sdkmanager --licenses > /dev/null || true
           # compileSdk 37 与 cmake 3.22.1 是 MaaFwApp 里写死的（AndroidCommon.kt、app/build.gradle.kts）
           # NDK 不钉版本：AGP 按默认版本自动下载；要固定就在 local.properties 写 build.ndkVersion
           sdkmanager --install "platforms;android-37" "cmake;3.22.1" "platform-tools" \
             || sdkmanager --install --channel=3 "platforms;android-37"
+          echo "--- 已安装 ---"
+          sdkmanager --list_installed | head -n 40
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
