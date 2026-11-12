@@ -1,0 +1,147 @@
+name: apk
+
+# 用 Android/MaaFwApp 这个子模块出 APK。
+# 和 install.yml 的 android 矩阵不是一回事：那边产的是资源包（install/ 目录 → 打 tag 时 zip），永远不会产 .apk。
+#
+# 签名走仓库 Secrets，不配也能跑通，只是产出未签名包（能构建、装不上）：
+#   KEYSTORE_B64      keystore 文件的 base64（单行，不要换行）
+#   KEYSTORE_PASSWORD store 密码
+#   KEY_ALIAS         key 别名
+#   KEY_PASSWORD      key 密码
+# 本地生成：
+#   keytool -genkeypair -v -keystore release.jks -alias maq -keyalg RSA -keysize 2048 -validity 10000
+#   base64 -w0 release.jks
+#   Windows: [Convert]::ToBase64String([IO.File]::ReadAllBytes("release.jks"))
+# 转出来的 base64 要先用 keytool -list 验证 keystore 本身没被加密软件写成密文
+
+env:
+  # 空 = 取 MaaFramework 最新 release；要钉死就写具体 tag（如 v5.16.0），可省掉一次 latest 查询
+  MAAFW_VERSION: ""
+
+on:
+  push:
+    branches:
+      - "main"
+    paths:
+      - ".github/workflows/apk.yml"
+      - "Android/**"
+      - "assets/**"
+  workflow_dispatch:
+
+concurrency:
+  group: apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # versionCode 是本仓库的提交数（子模块构建时版本号跟最外层仓库走），
+          # versionName 还要 git describe --tags：浅克隆这两者都会算错
+          fetch-depth: 0
+          # 不在这里整批拉子模块，下面按需拉：路径和 depth 都要控制
+          submodules: false
+
+      - name: 拉子模块
+        shell: bash
+        run: |
+          # Android/MaaFwApp 是 app 本体；assets/MaaCommonAssets 只用来取 OCR 模型
+          git submodule update --init --depth 1 -- Android/MaaFwApp assets/MaaCommonAssets
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          # 运行 Gradle 用；项目编译目标固定在 Java 17，见 build-logic/.../AndroidCommon.kt
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: 安装 SDK 组件
+        shell: bash
+        run: |
+          # 先接受许可，AGP 才能在构建时自动补装 NDK / build-tools
+          yes | sdkmanager --licenses > /dev/null || true
+          # compileSdk 37 与 cmake 3.22.1 是 MaaFwApp 里写死的（AndroidCommon.kt、app/build.gradle.kts）
+          # NDK 不钉版本：AGP 按默认版本自动下载；要固定就在 local.properties 写 build.ndkVersion
+          sdkmanager --install "platforms;android-37" "cmake;3.22.1" "platform-tools" \
+            || sdkmanager --install --channel=3 "platforms;android-37"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: 准备 PI 资源（OCR 模型）
+        shell: bash
+        run: |
+          # 从 assets/MaaCommonAssets 拷 ppocr_v6/small 到 assets/resource/model/ocr；
+          # 现在 pipeline 只有 StartApp/StopApp 用不到 OCR，但带上更保险，也让以后加 OCR 任务不用改 workflow
+          python3 tools/configure.py
+
+      - name: 铺 MaaFramework 的 so
+        working-directory: Android/MaaFwApp
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          # 落到 app/src/main/jniLibs/<abi>/，同时写 .maafwversion（进 BuildConfig 的框架版本号）
+          args=()
+          if [[ -n "$MAAFW_VERSION" ]]; then args+=(--tag "$MAAFW_VERSION"); fi
+          python3 scripts/setup_maa_framework.py "${args[@]}"
+
+      - name: 指向 PI 配方
+        working-directory: Android/MaaFwApp
+        shell: bash
+        run: |
+          # 配方就用仓库里那份 Android/pi-profile.sample.yaml：里面的 assets: ../assets 相对它自己解析
+          # 要改成 secret 注入时，把这里换成写文件，路径仍相对 MaaFwApp 根目录
+          echo "pi.profile=../pi-profile.sample.yaml" >> local.properties
+          cat local.properties
+
+      - name: 准备签名材料（可选）
+        env:
+          KEYSTORE_B64: ${{ secrets.KEYSTORE_B64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          # 四个变量都通过 env 传进来再 printf，避免 secret 里的 $ 反引号被 shell 二次展开
+          if [[ -z "$KEYSTORE_B64" ]]; then
+            echo "未配置 KEYSTORE_B64：本次产出未签名 APK（装不上），只用于验证构建链路" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/release.jks"
+          {
+            printf 'KEYSTORE_PATH=%s\n' "$RUNNER_TEMP/release.jks"
+            printf 'KEYSTORE_PASSWORD=%s\n' "$KEYSTORE_PASSWORD"
+            printf 'KEY_ALIAS=%s\n' "$KEY_ALIAS"
+            printf 'KEY_PASSWORD=%s\n' "$KEY_PASSWORD"
+          } >> "$GITHUB_ENV"
+          echo "已配置签名材料" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 出 APK
+        working-directory: Android/MaaFwApp
+        shell: bash
+        run: ./gradlew :app:assembleRelease --stacktrace
+
+      - name: 记录产物
+        if: always()
+        working-directory: Android/MaaFwApp
+        shell: bash
+        run: ls -lh app/build/outputs/apk/release/ 2>/dev/null || true
+
+      - uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: MaaQq-apk-${{ github.run_number }}
+          path: Android/MaaFwApp/app/build/outputs/apk/release/*.apk
+          if-no-files-found: error
