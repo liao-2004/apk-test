@@ -89,15 +89,36 @@ jobs:
       - name: 安装 SDK 组件
         shell: bash
         run: |
-          set -euo pipefail
-          # 先接受许可，AGP 才能在构建时自动补装 NDK / build-tools
-          yes | sdkmanager --licenses > /dev/null || true
-          # compileSdk 37 与 cmake 3.22.1 是 MaaFwApp 里写死的（AndroidCommon.kt、app/build.gradle.kts）
-          # NDK 不钉版本：AGP 按默认版本自动下载；要固定就在 local.properties 写 build.ndkVersion
-          sdkmanager --install "platforms;android-37" "cmake;3.22.1" "platform-tools" \
-            || sdkmanager --install --channel=3 "platforms;android-37"
-          echo "--- 已安装 ---"
-          sdkmanager --list_installed | head -n 40
+          set -uo pipefail
+          # 先接受许可，AGP 才能在构建时自动补装 NDK
+          yes | sdkmanager --licenses > /dev/null 2>&1 || true
+
+          # 失败时把 sdkmanager 的真实输出吐成 annotation：job 日志要鉴权，annotation 不用
+          note() { printf '::error title=sdkmanager::%s\n' "${1:0:800}"; }
+
+          # Google 的索引里 API 37 的基线包叫 platforms;android-37.0，没有 platforms;android-37；
+          # compileSdk 37 与 cmake 3.22.1 都是 MaaFwApp 写死的（AndroidCommon.kt、app/build.gradle.kts）
+          installed=""
+          for pkg in "platforms;android-37.0" "platforms;android-37"; do
+            if out=$(sdkmanager --install "$pkg" "build-tools;37.0.0" "platform-tools" "cmake;3.22.1" 2>&1); then
+              installed="$pkg"
+              echo "已安装 $pkg + build-tools;37.0.0 + platform-tools + cmake;3.22.1"
+              break
+            fi
+            note "[$pkg] $(printf '%s' "$out" | tr '\n' ' ' | tail -c 700)"
+          done
+          if [[ -z "$installed" ]]; then exit 1; fi
+
+          # 包名带 .0，AGP 找的是 platforms/android-37 目录，名字对不上就建软链补一个
+          SDK="${ANDROID_HOME:?ANDROID_HOME 未设置}"
+          if [[ ! -e "$SDK/platforms/android-37" && -d "$SDK/platforms/android-37.0" ]]; then
+            ln -s "$SDK/platforms/android-37.0" "$SDK/platforms/android-37"
+            echo "已建软链 platforms/android-37 -> android-37.0"
+          fi
+          echo "--- platforms ---"
+          ls -l "$SDK/platforms"
+          echo "--- build-tools ---"
+          ls "$SDK/build-tools" || true
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
