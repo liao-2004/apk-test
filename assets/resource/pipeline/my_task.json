@@ -4,8 +4,8 @@
             "prefix": "",
             "coordinateMode": "absolute-v1",
             "savedViewport": {
-                "x": -1278,
-                "y": 111,
+                "x": -2053,
+                "y": 282,
                 "zoom": 1.24
             },
             "filename": "新建Pipeline4",
@@ -77,13 +77,8 @@
         }
     },
     "失败节点": {
-        "recognition": {
-            "type": "OCR",
-            "param": {
-                "expected": [
-                    "咯咯哒"
-                ]
-            }
+        "action": {
+            "type": "StopTask"
         },
         "focus": {
             "Node.Recognition.Starting": "1.2",
@@ -98,8 +93,8 @@
         },
         "$__mpe_code": {
             "position": {
-                "x": 1685,
-                "y": 153
+                "x": 1693,
+                "y": 149
             }
         }
     }
