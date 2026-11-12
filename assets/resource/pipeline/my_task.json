@@ -4,8 +4,8 @@
             "prefix": "",
             "coordinateMode": "absolute-v1",
             "savedViewport": {
-                "x": -373,
-                "y": 160,
+                "x": -446,
+                "y": 220,
                 "zoom": 0.94
             },
             "filename": "新建Pipeline4",
@@ -19,6 +19,9 @@
                 "package": "com.tencent.mobileqq"
             }
         },
+        "next": [
+            "寻找qq邮箱"
+        ],
         "$__mpe_code": {
             "position": {
                 "x": 1126,
@@ -36,7 +39,26 @@
         "$__mpe_code": {
             "position": {
                 "x": 1129,
-                "y": 351
+                "y": 357
+            }
+        }
+    },
+    "寻找qq邮箱": {
+        "recognition": {
+            "type": "OCR",
+            "param": {
+                "expected": [
+                    "QQ邮箱"
+                ]
+            }
+        },
+        "action": {
+            "type": "Click"
+        },
+        "$__mpe_code": {
+            "position": {
+                "x": 1388,
+                "y": 170
             }
         }
     }
