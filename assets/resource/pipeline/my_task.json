@@ -4,9 +4,9 @@
             "prefix": "",
             "coordinateMode": "absolute-v1",
             "savedViewport": {
-                "x": -446,
-                "y": 220,
-                "zoom": 0.94
+                "x": -1278,
+                "y": 111,
+                "zoom": 1.24
             },
             "filename": "新建Pipeline4",
             "version": "v2.1.1"
@@ -55,10 +55,51 @@
         "action": {
             "type": "Click"
         },
+        "focus": {
+            "Node.Recognition.Starting": "1.1",
+            "Node.Recognition.Succeeded": "2.1",
+            "Node.Recognition.Failed": "3.1",
+            "Node.Action.Starting": "4.1",
+            "Node.Action.Succeeded": "5.1",
+            "Node.Action.Failed": "6.1",
+            "Node.WaitFreezes.Starting": "7.1",
+            "Node.WaitFreezes.Succeeded": "8.1",
+            "Node.WaitFreezes.Failed": "9.1"
+        },
+        "next": [
+            "失败节点"
+        ],
         "$__mpe_code": {
             "position": {
-                "x": 1388,
-                "y": 170
+                "x": 1423,
+                "y": 152
+            }
+        }
+    },
+    "失败节点": {
+        "recognition": {
+            "type": "OCR",
+            "param": {
+                "expected": [
+                    "咯咯哒"
+                ]
+            }
+        },
+        "focus": {
+            "Node.Recognition.Starting": "1.2",
+            "Node.Recognition.Succeeded": "2.2",
+            "Node.Recognition.Failed": "3.2",
+            "Node.Action.Starting": "4.2",
+            "Node.Action.Succeeded": "5.2",
+            "Node.Action.Failed": "6.2",
+            "Node.WaitFreezes.Starting": "7.2",
+            "Node.WaitFreezes.Succeeded": "8.2",
+            "Node.WaitFreezes.Failed": "9.2"
+        },
+        "$__mpe_code": {
+            "position": {
+                "x": 1685,
+                "y": 153
             }
         }
     }
